@@ -5,8 +5,7 @@ Smart India Hackathon · Problem Statement **26088** · Ministry of Cooperation 
 A multilingual assistant that answers questions about cooperative law, Ministry of
 Cooperation schemes, PACS services, PMFBY crop insurance and financial literacy —
 and lets people file and track a grievance. It runs in any browser, on a phone or
-a laptop, and the same server also drives an ESP32 voice device over the local
-network.
+a laptop.
 
 Answers are grounded in documents you supply (RAG), so the bot quotes your PDFs
 rather than inventing rules. When it cannot find an answer it says so and points
@@ -82,8 +81,8 @@ Open <http://localhost:3000>.
 - **/grievance** — file a grievance, get a reference number
 - **/track** — look up a grievance by reference number
 
-`npm run dev` binds to `0.0.0.0`, not just localhost, so your phone and the ESP32
-can reach it over wifi. Find your laptop's IP with `ipconfig` (look for IPv4
+`npm run dev` binds to `0.0.0.0`, not just localhost, so your phone can reach it
+over wifi. Find your laptop's IP with `ipconfig` (look for IPv4
 Address on your wifi adapter) and open `http://192.168.x.x:3000` on your phone.
 
 > If Windows Firewall prompts on first run, allow Node.js on **private
@@ -91,7 +90,7 @@ Address on your wifi adapter) and open `http://192.168.x.x:3000` on your phone.
 
 ---
 
-## Testing `/api/voice` without the ESP32
+## Testing `/api/voice` from the command line
 
 The voice endpoint takes **raw 16-bit PCM, mono, 16000 Hz** in the request body
 and returns **raw PCM in the same format**. No WAV header either direction, no
@@ -149,8 +148,7 @@ headers cannot hold Devanagari or Tamil. Decode either one:
 grep -i "^x-answer:" headers.txt | cut -d' ' -f2 | tr -d '\r' | base64 -d
 ```
 
-The ESP32 ignores these headers entirely — they exist for debugging and for the
-browser mic button.
+They exist for debugging and for the browser mic button.
 
 ### Or just use the browser
 
@@ -161,39 +159,7 @@ way to test the whole voice pipeline end to end.
 > Browser mics only work over HTTPS or on `localhost`. Testing from your phone
 > at `http://192.168.x.x:3000`, the mic button will be blocked by the browser —
 > that is a browser security rule, not a bug in the app. Text chat works fine
-> there. The ESP32 is unaffected; it is not a browser.
-
----
-
-## Connecting the ESP32
-
-Point the firmware at `http://<your-laptop-ip>:3000/api/voice`.
-
-**Contract:**
-
-| Direction | Format |
-|---|---|
-| Request body | raw PCM, 16-bit signed, little-endian, mono, 16000 Hz |
-| Response body | raw PCM, 16-bit signed, little-endian, mono, 16000 Hz |
-| Response `Content-Type` | `application/octet-stream` |
-
-Things that were built deliberately for the device:
-
-- **No auth, no CORS negotiation, no preflight.** The endpoint is wide open.
-  This is fine on a demo LAN and *not* fine on the public internet — if you ever
-  deploy this, put a shared-secret header on it first.
-- **`Content-Length` is set explicitly** on the reply, and the response is not
-  chunked (verified against the dev server). Your firmware can read the length
-  up front and allocate a buffer, instead of parsing chunked encoding.
-- **Nothing assumes HTTPS or a domain name.** Plain HTTP to an IP works.
-- **Size limits:** requests under 0.1s of audio get `400`, over ~30s get `413`.
-  If Whisper hears nothing at all, you get a `204` with an empty body — treat
-  that as "ask the user to repeat".
-- `GET /api/voice` returns a short text string, handy as a "is the server up?"
-  check from the device.
-
-A round trip is roughly 3–6 seconds (Whisper + chat + TTS), and the device is
-blocked for that whole time, so set your HTTP client timeout to at least 20s.
+> there.
 
 ---
 
@@ -209,7 +175,21 @@ blocked for that whole time, so set your HTTP client timeout to at least 20s.
 `[{role, content}]` turns, so follow-up questions work.
 
 ### `POST /api/voice`
-Raw PCM in, raw PCM out. See above.
+
+| Direction | Format |
+|---|---|
+| Request body | raw PCM, 16-bit signed, little-endian, mono, 16000 Hz |
+| Response body | raw PCM, 16-bit signed, little-endian, mono, 16000 Hz |
+| Response `Content-Type` | `application/octet-stream` |
+
+No WAV header either direction, no multipart, no JSON. `X-Transcript` and
+`X-Answer` come back base64-encoded.
+
+Requests under 0.1s of audio get `400`, over ~30s get `413`. If Whisper hears
+nothing at all you get a `204` with an empty body — treat that as "ask the user
+to repeat". A round trip is roughly 3–6 seconds (Whisper + chat + TTS), so allow
+a generous client timeout. `GET /api/voice` returns a short string, handy as an
+"is the server up?" check.
 
 ### `POST /api/grievance`
 ```json
@@ -242,10 +222,10 @@ app/
   grievance/page.js        grievance form
   track/page.js            grievance tracker
   api/ask/route.js         text Q&A
-  api/voice/route.js       ESP32 voice endpoint
+  api/voice/route.js       voice endpoint (PCM in, PCM out)
   api/grievance/route.js   file (POST) + track (GET)
 components/
-  VoiceButton.js           browser mic, same PCM format as the ESP32
+  VoiceButton.js           browser mic → /api/voice
 lib/
   rag.js                   answerFromRAG() — the brain
   vectorStore.js           JSON vector store + retrieveRelevantChunks()
@@ -310,7 +290,7 @@ language either way.
 - Grievances are stored in a JSON file with no authentication. Anyone who can
   reach the server can file one, and anyone with a reference ID can read that
   record. Good enough for a demo, not for production.
-- `/api/voice` is intentionally unauthenticated so a microcontroller can call it.
-  Do not expose this server to the internet as it stands.
+- `/api/voice` is unauthenticated and wide open. Fine on a demo LAN, not fine on
+  the public internet — put a shared secret on it before deploying anywhere.
 - Answer quality is entirely a function of the documents you ingest. The system
   prompt stops it inventing facts, but it cannot invent coverage.

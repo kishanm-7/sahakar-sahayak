@@ -11,9 +11,10 @@ import { AnimatePresence, motion } from 'framer-motion';
 // Silence   → auto-stops after SILENCE_TIMEOUT_MS of quiet after speech.
 // Safety cap → always stops after MAX_RECORDING_MS regardless.
 //
-// Talks to /api/voice with raw 16-bit PCM (same format the ESP32 uses).
+// Talks to /api/voice with raw 16-bit PCM, mono, 16000 Hz.
 // We bypass MediaRecorder (which outputs WebM/Opus) and tap the raw Web
-// Audio graph instead so the endpoint can accept bare samples.
+// Audio graph instead, so the endpoint receives bare samples it can hand
+// straight to Whisper after adding a WAV header.
 // ---------------------------------------------------------------------------
 
 const TARGET_RATE = 16000;

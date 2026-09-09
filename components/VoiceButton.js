@@ -3,15 +3,16 @@
 import { useRef, useState } from 'react';
 
 // ---------------------------------------------------------------------------
-// Browser microphone button.
+// Browser microphone button — TAP-TO-TOGGLE mode.
 //
-// This talks to the exact same /api/voice endpoint the ESP32 uses, in the
-// exact same format: raw 16-bit PCM at 16000 Hz up, raw PCM back down. That is
-// deliberate -- it means you can demo and debug the hardware audio path with
-// nothing but a laptop, and any bug you fix here is fixed for the device too.
+// Tap once  → starts recording.
+// Tap again → stops recording early (sends whatever was captured).
+// Silence   → auto-stops after SILENCE_TIMEOUT_MS of quiet after speech.
+// Safety cap → always stops after MAX_RECORDING_MS regardless.
 //
-// Note we do NOT use MediaRecorder: it produces WebM/Opus, and the endpoint
-// expects bare samples. So we tap the raw audio graph instead.
+// Talks to /api/voice with raw 16-bit PCM (same format the ESP32 uses).
+// We bypass MediaRecorder (which outputs WebM/Opus) and tap the raw Web
+// Audio graph instead so the endpoint can accept bare samples.
 // ---------------------------------------------------------------------------
 
 const TARGET_RATE = 16000;
@@ -196,7 +197,7 @@ export default function VoiceButton({ onResult, onError, disabled, language }) {
 
     if (trimmed.length < inputRate * 0.3) {
       setState('idle');
-      onError?.('That was too short. Hold the button while you speak.');
+      onError?.('That was too short. Tap the mic button, speak, then the recording will stop automatically.');
       return;
     }
 
@@ -256,36 +257,55 @@ export default function VoiceButton({ onResult, onError, disabled, language }) {
     await ctx.close();
   }
 
+  // Single tap handler: start if idle, stop early if already recording.
+  function handleClick() {
+    if (state === 'idle') {
+      startRecording();
+    } else if (state === 'recording') {
+      stopRecording();
+    }
+    // While 'working' the button is disabled, so no action needed.
+  }
+
+  const ariaLabel =
+    state === 'recording' ? 'Listening… tap to stop' : state === 'working' ? 'Processing…' : 'Tap to speak';
+
+  const tooltip =
+    state === 'recording' ? 'Tap to stop recording' : state === 'working' ? 'Processing audio…' : 'Tap to speak';
+
   return (
     <button
       type="button"
       disabled={disabled || state === 'working'}
-      // Pointer events cover mouse and touch with one set of handlers.
-      onPointerDown={state === 'idle' ? startRecording : undefined}
-      onPointerUp={state === 'recording' ? stopRecording : undefined}
-      onPointerLeave={state === 'recording' ? stopRecording : undefined}
+      onClick={handleClick}
       className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-all select-none focus:outline-none focus:ring-2 focus:ring-emerald-500/40 ${
         state === 'recording'
-          ? 'bg-rose-600 text-white animate-pulse shadow-md ring-4 ring-rose-200'
+          ? 'bg-rose-600 text-white shadow-md ring-4 ring-rose-200'
           : state === 'working'
           ? 'bg-emerald-800 text-white opacity-80 cursor-wait'
           : 'bg-[#1B5E3F] text-white hover:bg-[#154a32] shadow-sm active:scale-95 disabled:opacity-50'
       }`}
-      title={
-        state === 'recording'
-          ? 'Release to send voice'
-          : state === 'working'
-          ? 'Processing audio…'
-          : 'Hold to speak'
-      }
-      aria-label="Hold to speak"
+      title={tooltip}
+      aria-label={ariaLabel}
     >
+      {/* Pulsing ring overlay when recording */}
+      {state === 'recording' && (
+        <span className="absolute inset-0 rounded-full animate-ping bg-rose-400 opacity-40" />
+      )}
+
       {state === 'working' ? (
+        /* Spinner while processing */
         <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
+      ) : state === 'recording' ? (
+        /* Stop square icon while recording */
+        <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
+          <rect x="6" y="6" width="12" height="12" rx="2" />
+        </svg>
       ) : (
+        /* Microphone icon while idle */
         <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
           <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
           <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />

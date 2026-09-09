@@ -1,0 +1,4 @@
+{
+  "_comment": "Optional manual tagging. Key = exact filename inside /documents, value = one of: law | scheme | pmfby | finance | grievance. Anything not listed here gets its category guessed from the filename by scripts/ingest.js.",
+  "example-file-name.pdf": "law"
+}

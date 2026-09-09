@@ -1,0 +1,26 @@
+{
+  "name": "sahakar-sahayak",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Multilingual Cooperative Governance & Legal Assistance Chatbot (SIH PS 26088)",
+  "scripts": {
+    "dev": "next dev -H 0.0.0.0",
+    "build": "next build",
+    "start": "next start -H 0.0.0.0",
+    "ingest": "node scripts/ingest.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "next": "^14.2.35",
+    "openai": "^4.68.4",
+    "pdf-parse": "^1.1.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14"
+  }
+}

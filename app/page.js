@@ -205,7 +205,7 @@ export default function ChatPage() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1, duration: 0.5, ease: EASE }}
-        className="edge-gradient min-h-[30dvh] rounded-3xl bg-white/80 p-3.5 shadow-lift backdrop-blur-sm sm:min-h-[48vh] sm:p-6"
+        className="edge-gradient min-h-[30dvh] rounded-3xl bg-white/80 p-4 shadow-lift backdrop-blur-sm sm:min-h-[48vh] sm:p-6"
       >
         <div className="flex flex-col gap-4">
           {messages.map((m, i) => {
@@ -312,22 +312,25 @@ export default function ChatPage() {
                   Suggested Queries
                 </motion.span>
 
-                {/* One swipeable, snapping row on phones -- four long
-                    multilingual questions stacked onto four lines at 375px.
-                    Desktop keeps the wrap. The negative margin lets chips bleed
-                    to the card edge so the row reads as scrollable. */}
-                <div className="no-scrollbar -mx-3.5 flex snap-x snap-mandatory gap-2 overflow-x-auto px-3.5 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
+                {/* Stacked full-width rows on phones, wrapping pills from sm up.
+                    This was a horizontal snap-scroller, which clipped the second
+                    chip mid-word at the card edge -- it read as a broken layout
+                    rather than as something swipeable. The scroller only existed
+                    because four wrapped chips used to push the composer off
+                    screen; that stopped being true once the chips moved inside
+                    the conversation card, so nothing has to be clipped now. */}
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                   {SUGGESTIONS.map((s) => (
                     <motion.button
                       key={s}
                       variants={chipItem}
                       whileHover={{ scale: 1.03, y: -2 }}
-                      whileTap={{ scale: 0.96 }}
+                      whileTap={{ scale: 0.97 }}
                       onClick={() => send(s)}
-                      className="flex min-h-touch max-w-[78%] shrink-0 snap-start items-center rounded-full border border-brand-800/15 bg-white/80 px-4 py-2 text-left text-xs font-semibold text-brand-800 shadow-soft backdrop-blur-sm transition-colors hover:border-brand-600/40 hover:bg-brand-50 sm:max-w-none sm:shrink"
+                      className="flex min-h-touch w-full items-center gap-2 rounded-2xl border border-brand-800/15 bg-white/80 px-4 py-2.5 text-left text-[13px] font-semibold leading-snug text-brand-800 shadow-soft backdrop-blur-sm transition-colors hover:border-brand-600/40 hover:bg-brand-50 sm:w-auto sm:rounded-full sm:py-2 sm:text-xs"
                     >
-                      <span className="mr-1.5" aria-hidden>💡</span>
-                      {s}
+                      <span className="shrink-0" aria-hidden>💡</span>
+                      <span className="min-w-0">{s}</span>
                     </motion.button>
                   ))}
                 </div>

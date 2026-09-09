@@ -50,7 +50,7 @@ export default function RootLayout({ children }) {
 
           {/* pb clears the fixed bottom tab bar on phones; md:pb-10 drops that
               reserve once the tab bar is hidden and the pill nav takes over. */}
-          <main className="mx-auto w-full max-w-4xl flex-1 px-4 pb-[var(--content-bottom)] pt-4 sm:px-6 sm:pt-6 md:pb-10">
+          <main className="mx-auto w-full max-w-4xl flex-1 px-4 pb-[var(--content-bottom)] pt-5 sm:px-6 sm:pt-6 md:pb-10">
             <PageTransition>{children}</PageTransition>
           </main>
 

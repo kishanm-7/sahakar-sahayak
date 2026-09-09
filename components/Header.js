@@ -27,7 +27,11 @@ export default function Header() {
     >
       <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-2.5 sm:px-6 sm:py-3">
         {/* ---- Logo & wordmark ---- */}
-        <Link href="/" className="group flex min-h-touch shrink-0 items-center gap-2.5">
+        {/* min-w-0 + flex-1, NOT shrink-0. As shrink-0 this block refused to
+            give up any width, so on a 360px phone the wordmark pushed the
+            language pill into (and past) the right edge -- the collision that
+            looked like the header overlapping the hero card. */}
+        <Link href="/" className="group flex min-h-touch min-w-0 flex-1 items-center gap-2.5">
           <motion.div
             whileHover={{ scale: 1.06, rotate: -3 }}
             whileTap={{ scale: 0.92 }}
@@ -51,7 +55,11 @@ export default function Header() {
             >
               SahAI Sathi
             </span>
-            <span className="mt-0.5 font-display text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:text-[10px]">
+            {/* Hidden on phones. At 9px with wide tracking this tagline is
+                ~226px, which does not fit beside the logo and the language
+                pill at 360px. Truncating a tagline reads as broken, so it
+                simply steps out of the way until there is room. */}
+            <span className="mt-0.5 hidden truncate font-display text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:block sm:text-[10px]">
               Multilingual Cooperative Assistant
             </span>
           </div>

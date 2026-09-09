@@ -37,7 +37,7 @@ export async function POST(request) {
       );
     }
 
-    const record = createGrievance({ name, phone, category, description, language });
+    const record = await createGrievance({ name, phone, category, description, language });
 
     return NextResponse.json({
       referenceId: record.referenceId,
@@ -65,7 +65,7 @@ export async function GET(request) {
       );
     }
 
-    const record = getGrievance(ref);
+    const record = await getGrievance(ref);
 
     if (!record) {
       return NextResponse.json(

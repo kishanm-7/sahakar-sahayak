@@ -1,3 +1,4 @@
+import './load-env.js';
 import { updateGrievanceStatus, listGrievances, STATUSES } from '../lib/grievances.js';
 
 // Move a grievance along, so the Track page has something to show during a
@@ -10,7 +11,7 @@ import { updateGrievanceStatus, listGrievances, STATUSES } from '../lib/grievanc
 const [ref, status, ...noteParts] = process.argv.slice(2);
 
 if (!ref) {
-  const all = listGrievances();
+  const all = await listGrievances();
   if (!all.length) {
     console.log('\nNo grievances filed yet.\n');
   } else {
@@ -28,7 +29,7 @@ if (!STATUSES.includes(status)) {
   process.exit(1);
 }
 
-const updated = updateGrievanceStatus(ref.toUpperCase(), status, noteParts.join(' '));
+const updated = await updateGrievanceStatus(ref.toUpperCase(), status, noteParts.join(' '));
 
 if (!updated) {
   console.error(`\n  No grievance found with reference ${ref}\n`);

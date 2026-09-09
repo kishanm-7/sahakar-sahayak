@@ -193,7 +193,7 @@ async function main() {
   const byCategory = {};
   for (const c of stored) byCategory[c.category] = (byCategory[c.category] || 0) + 1;
 
-  console.log('\n\nDone. Saved to data/vectors.json');
+  console.log('\n\nDone. Saved to data/vectors.json and data/vectors.json.gz (compressed for production deployment)');
   console.log(`  documents : ${new Set(stored.map((c) => c.source)).size}`);
   console.log(`  chunks    : ${stored.length}`);
   for (const cat of CATEGORIES) {

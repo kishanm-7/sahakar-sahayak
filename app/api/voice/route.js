@@ -49,15 +49,27 @@ export async function POST(request) {
       return new Response('Audio too long', { status: 413, headers: corsHeaders() });
     }
 
+    // Read language header from UI selection or request
+    const reqLang = request.headers.get('X-Language') || new URL(request.url).searchParams.get('language') || 'auto';
+
     assertApiKey();
 
     // 2. Give the samples a WAV header so Whisper recognises the format.
     const wavIn = pcmToWav(pcmIn, DEVICE_SAMPLE_RATE, 1, 16);
 
-    const transcription = await getOpenAI().audio.transcriptions.create({
+    const sttParams = {
       file: await toFile(wavIn, 'speech.wav', { type: 'audio/wav' }),
       model: MODELS.stt,
-    });
+    };
+
+    if (reqLang && reqLang !== 'auto') {
+      sttParams.language = reqLang;
+    } else {
+      // Bias auto-detection towards supported languages: English, Hindi, Malayalam, Tamil
+      sttParams.prompt = "Audio in English, Hindi (हिन्दी), Malayalam (മലയാളം), or Tamil (தமிழ்).";
+    }
+
+    const transcription = await getOpenAI().audio.transcriptions.create(sttParams);
 
     const userText = (transcription.text || '').trim();
 
@@ -69,10 +81,9 @@ export async function POST(request) {
     }
 
     // 3. Same brain as the web chat -- one code path, so a fix in the RAG
-    //    prompt improves both surfaces at once. Language is auto-detected
-    //    from whatever Whisper transcribed, so the device replies in the
-    //    language the person actually spoke.
-    const { answer } = await answerFromRAG(userText, { language: 'auto' });
+    //    prompt improves both surfaces at once. Target language is passed
+    //    from the UI selection or auto-detected.
+    const { answer } = await answerFromRAG(userText, { language: reqLang });
 
     // 4. Speak the answer. We ask for WAV so we get uncompressed samples the
     //    ESP32 can play without a decoder. (This model also supports a raw

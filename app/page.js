@@ -204,7 +204,7 @@ export default function ChatPage() {
         className="sticky bottom-4 flex items-center gap-2 rounded-full border border-emerald-900/15 bg-white p-2 shadow-lg backdrop-blur-md hover:shadow-xl transition-all"
       >
         {/* Left: Circular Green Voice Mic Button */}
-        <VoiceButton onResult={handleVoiceResult} onError={setError} disabled={busy} />
+        <VoiceButton language={language} onResult={handleVoiceResult} onError={setError} disabled={busy} />
 
         {/* Center: Input Field */}
         <input

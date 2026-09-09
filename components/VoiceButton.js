@@ -57,7 +57,7 @@ function decodeHeader(value) {
   }
 }
 
-export default function VoiceButton({ onResult, onError, disabled }) {
+export default function VoiceButton({ onResult, onError, disabled, language }) {
   const [state, setState] = useState('idle'); // idle | recording | working
   const recorder = useRef(null);
   const stopRecordingRef = useRef(null);
@@ -205,7 +205,10 @@ export default function VoiceButton({ onResult, onError, disabled }) {
     try {
       const res = await fetch('/api/voice', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/octet-stream' },
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          'X-Language': language || 'auto',
+        },
         body: pcm.buffer,
       });
 

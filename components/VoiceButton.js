@@ -15,6 +15,9 @@ import { useRef, useState } from 'react';
 // ---------------------------------------------------------------------------
 
 const TARGET_RATE = 16000;
+const SILENCE_THRESHOLD = 0.008; // RMS energy threshold for speech detection
+const SILENCE_TIMEOUT_MS = 1200; // Auto-stop after 1.2s of trailing silence following speech
+const MAX_RECORDING_MS = 10000;  // Hard safety cap: force-stop at 10 seconds
 
 /** Same linear interpolation as lib/audio.js, but on the browser side. */
 function resampleFloat32(input, fromRate, toRate) {
@@ -57,6 +60,7 @@ function decodeHeader(value) {
 export default function VoiceButton({ onResult, onError, disabled }) {
   const [state, setState] = useState('idle'); // idle | recording | working
   const recorder = useRef(null);
+  const stopRecordingRef = useRef(null);
 
   async function startRecording() {
     try {
@@ -69,9 +73,51 @@ export default function VoiceButton({ onResult, onError, disabled }) {
       const processor = ctx.createScriptProcessor(4096, 1, 1);
       const chunks = [];
 
+      const recObj = {
+        stream,
+        ctx,
+        source,
+        processor,
+        mute: null,
+        chunks,
+        stopped: false,
+        maxTimer: null,
+        hasSpoken: false,
+        lastSpeechTime: 0,
+      };
+
+      // 10-second hard safety cap
+      recObj.maxTimer = setTimeout(() => {
+        if (stopRecordingRef.current) {
+          stopRecordingRef.current();
+        }
+      }, MAX_RECORDING_MS);
+
       processor.onaudioprocess = (e) => {
-        // The buffer is reused between callbacks, so copy before storing.
-        chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+        if (recObj.stopped) return;
+        const channelData = e.inputBuffer.getChannelData(0);
+        const copy = new Float32Array(channelData);
+        chunks.push(copy);
+
+        // VAD: calculate RMS energy
+        let sum = 0;
+        for (let i = 0; i < copy.length; i++) {
+          sum += copy[i] * copy[i];
+        }
+        const rms = Math.sqrt(sum / copy.length);
+        const now = Date.now();
+
+        if (rms > SILENCE_THRESHOLD) {
+          recObj.hasSpoken = true;
+          recObj.lastSpeechTime = now;
+        } else if (recObj.hasSpoken && recObj.lastSpeechTime > 0) {
+          if (now - recObj.lastSpeechTime >= SILENCE_TIMEOUT_MS) {
+            // Auto stop due to 1.2s trailing silence following speech
+            if (stopRecordingRef.current) {
+              stopRecordingRef.current();
+            }
+          }
+        }
       };
 
       // A muted gain node keeps the graph running without piping the mic
@@ -81,8 +127,9 @@ export default function VoiceButton({ onResult, onError, disabled }) {
       source.connect(processor);
       processor.connect(mute);
       mute.connect(ctx.destination);
+      recObj.mute = mute;
 
-      recorder.current = { stream, ctx, source, processor, mute, chunks };
+      recorder.current = recObj;
       setState('recording');
     } catch (err) {
       onError?.(
@@ -94,20 +141,41 @@ export default function VoiceButton({ onResult, onError, disabled }) {
 
   async function stopRecording() {
     const r = recorder.current;
-    if (!r) return;
+    if (!r || r.stopped) return;
+    r.stopped = true;
     recorder.current = null;
+
+    if (r.maxTimer) {
+      clearTimeout(r.maxTimer);
+    }
+
+    // Immediately stop audio processing graph
+    r.processor.onaudioprocess = null;
+    try {
+      r.processor.disconnect();
+      r.source.disconnect();
+      r.mute.disconnect();
+      r.stream.getTracks().forEach((t) => t.stop());
+    } catch {
+      // ignore disconnect errors
+    }
+
     setState('working');
 
-    r.processor.disconnect();
-    r.source.disconnect();
-    r.mute.disconnect();
-    r.stream.getTracks().forEach((t) => t.stop());
-
     const inputRate = r.ctx.sampleRate; // usually 44100 or 48000
-    await r.ctx.close();
+    try {
+      await r.ctx.close();
+    } catch {
+      // ignore close errors
+    }
 
     // Flatten every captured block into one signal.
     const total = r.chunks.reduce((n, c) => n + c.length, 0);
+    if (total === 0) {
+      setState('idle');
+      return;
+    }
+
     const merged = new Float32Array(total);
     let offset = 0;
     for (const c of r.chunks) {
@@ -115,13 +183,24 @@ export default function VoiceButton({ onResult, onError, disabled }) {
       offset += c.length;
     }
 
-    if (total < inputRate * 0.3) {
+    // Trim trailing silence off the end of the recording clip
+    let lastActiveIdx = merged.length - 1;
+    while (lastActiveIdx > 0 && Math.abs(merged[lastActiveIdx]) < SILENCE_THRESHOLD) {
+      lastActiveIdx--;
+    }
+
+    // Keep a small 200ms padding after the last active speech sample
+    const padding = Math.floor(inputRate * 0.2);
+    const trimmedLength = Math.min(merged.length, lastActiveIdx + 1 + padding);
+    const trimmed = merged.subarray(0, trimmedLength);
+
+    if (trimmed.length < inputRate * 0.3) {
       setState('idle');
       onError?.('That was too short. Hold the button while you speak.');
       return;
     }
 
-    const pcm = floatToPcm16(resampleFloat32(merged, inputRate, TARGET_RATE));
+    const pcm = floatToPcm16(resampleFloat32(trimmed, inputRate, TARGET_RATE));
 
     try {
       const res = await fetch('/api/voice', {
@@ -150,6 +229,8 @@ export default function VoiceButton({ onResult, onError, disabled }) {
       setState('idle');
     }
   }
+
+  stopRecordingRef.current = stopRecording;
 
   /** The reply is bare samples, so we rebuild an AudioBuffer around it. */
   async function playPcm(arrayBuffer, sampleRate) {
@@ -210,4 +291,3 @@ export default function VoiceButton({ onResult, onError, disabled }) {
     </button>
   );
 }
-

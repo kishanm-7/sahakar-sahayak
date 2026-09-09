@@ -8,7 +8,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 // ---------------------------------------------------------------------------
-// POST /api/voice  --  the ESP32 & Web Microphone endpoint.
+// POST /api/voice  --  the web microphone endpoint.
 //
 // IN : raw 16-bit PCM, mono, 16000 Hz, little-endian. Just bytes in the body.
 // OUT: raw 16-bit PCM, mono, 16000 Hz, little-endian, as application/octet-stream.

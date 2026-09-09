@@ -16,7 +16,7 @@ const display = Plus_Jakarta_Sans({
 });
 
 export const metadata = {
-  title: 'Sahakar Sahayak — Cooperative Help Line',
+  title: 'SahAI Sathi — Cooperative Help Line',
   description:
     'Multilingual assistance on cooperative law, government schemes, PMFBY crop insurance, financial literacy and grievance redressal.',
 };
@@ -57,7 +57,7 @@ export default function RootLayout({ children }) {
           <footer className="mt-auto border-t border-brand-900/10 bg-parchment/40 pb-[var(--content-bottom)] pt-8 text-center text-xs text-slate-500 backdrop-blur-sm md:pb-8">
             <div className="mx-auto max-w-4xl px-4">
               <p className="font-display text-sm font-semibold text-slate-700">
-                <span className="text-gradient">Sahakar Sahayak</span>
+                <span className="text-gradient">SahAI Sathi</span>
               </p>
               <p className="mt-1">Multilingual Cooperative &amp; Agricultural Assistance</p>
               <p className="mx-auto mt-3 max-w-lg leading-relaxed opacity-80">

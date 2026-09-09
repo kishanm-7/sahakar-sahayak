@@ -225,7 +225,7 @@ export default function ChatPage() {
                       🏛️
                     </span>
                     <span className="font-display text-sm font-bold tracking-tight text-brand-800">
-                      Sahakar Sahayak
+                      SahAI Sathi
                     </span>
                   </div>
                   <p className="text-[15px] leading-relaxed text-slate-700">{m.content}</p>

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { LANGUAGES } from '@/lib/languages';
@@ -31,25 +32,27 @@ export default function Header() {
             whileHover={{ scale: 1.06, rotate: -3 }}
             whileTap={{ scale: 0.92 }}
             transition={{ type: 'spring', stiffness: 400, damping: 17 }}
-            className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-brand-gradient text-white shadow-glow"
+            className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl overflow-hidden shadow-glow"
           >
+            <Image
+              src="/sahai-sathi-logo.png"
+              alt="SahAI Sathi logo"
+              width={40}
+              height={40}
+              className="h-10 w-10 object-cover"
+              priority
+            />
             <span className="pointer-events-none absolute inset-0 rounded-xl shadow-inset" />
-            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 22V11" />
-              <path d="M12 11C12 7.7 9.8 5 6 4.6c-.4 3.6 1.7 6.4 6 6.4z" fill="currentColor" fillOpacity=".35" />
-              <path d="M12 12.5c0-3.6 2.4-6.5 6.5-7 .4 3.9-1.9 7-6.5 7z" fill="currentColor" fillOpacity=".55" />
-            </svg>
           </motion.div>
 
           <div className="flex min-w-0 flex-col leading-none">
             <span
-              lang="hi"
               className="truncate text-[15px] font-bold leading-tight tracking-tight text-brand-800 transition-colors group-hover:text-brand-600 sm:text-[17px]"
             >
-              सहकार सहायक
+              SahAI Sathi
             </span>
             <span className="mt-0.5 font-display text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:text-[10px]">
-              Cooperative Sahayak
+              Multilingual Cooperative Assistant
             </span>
           </div>
         </Link>

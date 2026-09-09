@@ -1,4 +1,4 @@
-# Sahakar Sahayak — Multilingual Cooperative Governance & Legal Assistance Chatbot
+# SahAI Sathi — Multilingual Cooperative Governance & Legal Assistance Chatbot
 
 Smart India Hackathon · Problem Statement **26088** · Ministry of Cooperation / NCCT
 

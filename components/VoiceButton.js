@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 
 // ---------------------------------------------------------------------------
 // Browser microphone button — TAP-TO-TOGGLE mode.
@@ -273,44 +274,113 @@ export default function VoiceButton({ onResult, onError, disabled, language }) {
   const tooltip =
     state === 'recording' ? 'Tap to stop recording' : state === 'working' ? 'Processing audio…' : 'Tap to speak';
 
+  const isRecording = state === 'recording';
+  const isWorking = state === 'working';
+
   return (
-    <button
+    <motion.button
       type="button"
-      disabled={disabled || state === 'working'}
+      disabled={disabled || isWorking}
       onClick={handleClick}
-      className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-all select-none focus:outline-none focus:ring-2 focus:ring-emerald-500/40 ${
-        state === 'recording'
-          ? 'bg-rose-600 text-white shadow-md ring-4 ring-rose-200'
-          : state === 'working'
-          ? 'bg-emerald-800 text-white opacity-80 cursor-wait'
-          : 'bg-[#1B5E3F] text-white hover:bg-[#154a32] shadow-sm active:scale-95 disabled:opacity-50'
+      whileHover={!isRecording && !isWorking ? { scale: 1.06 } : undefined}
+      whileTap={!isWorking ? { scale: 0.94 } : undefined}
+      transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+      className={`relative flex h-11 w-11 shrink-0 select-none items-center justify-center rounded-full text-white transition-colors duration-300 disabled:opacity-50 ${
+        isRecording
+          ? 'bg-rose-600 shadow-glow-rose'
+          : isWorking
+          ? 'cursor-wait bg-brand-800 shadow-soft'
+          : 'bg-brand-gradient shadow-glow'
       }`}
       title={tooltip}
       aria-label={ariaLabel}
     >
-      {/* Pulsing ring overlay when recording */}
-      {state === 'recording' && (
-        <span className="absolute inset-0 rounded-full animate-ping bg-rose-400 opacity-40" />
-      )}
+      {/* ---- Recording glow ----
+          Two rings expanding on the same loop but offset by half a cycle, so
+          there is always one mid-flight. Purely decorative; the button itself
+          keeps its solid fill underneath. */}
+      <AnimatePresence>
+        {isRecording && (
+          <>
+            {[0, 1].map((i) => (
+              <motion.span
+                key={i}
+                aria-hidden
+                className="absolute inset-0 rounded-full bg-rose-500"
+                initial={{ opacity: 0.5, scale: 1 }}
+                animate={{ opacity: [0.5, 0], scale: [1, 2.1] }}
+                exit={{ opacity: 0 }}
+                transition={{
+                  duration: 1.8,
+                  ease: 'easeOut',
+                  repeat: Infinity,
+                  delay: i * 0.9,
+                }}
+              />
+            ))}
+            {/* Soft breathing halo directly on the button */}
+            <motion.span
+              aria-hidden
+              className="absolute -inset-1 rounded-full bg-rose-400/30 blur-md"
+              animate={{ opacity: [0.35, 0.8, 0.35], scale: [0.95, 1.1, 0.95] }}
+              transition={{ duration: 1.9, ease: 'easeInOut', repeat: Infinity }}
+            />
+          </>
+        )}
+      </AnimatePresence>
 
-      {state === 'working' ? (
-        /* Spinner while processing */
-        <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-        </svg>
-      ) : state === 'recording' ? (
-        /* Stop square icon while recording */
-        <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
-          <rect x="6" y="6" width="12" height="12" rx="2" />
-        </svg>
-      ) : (
-        /* Microphone icon while idle */
-        <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
-          <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
-          <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
-        </svg>
-      )}
-    </button>
+      {/* Icon swap, cross-faded and rotated slightly so states feel connected. */}
+      <span className="relative z-10 flex h-5 w-5 items-center justify-center">
+        <AnimatePresence mode="wait" initial={false}>
+          {isWorking ? (
+            <motion.span
+              key="working"
+              initial={{ opacity: 0, scale: 0.6 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.6 }}
+              transition={{ duration: 0.18 }}
+              className="absolute"
+            >
+              {/* Orbiting dot reads calmer than a spinning arc. */}
+              <motion.svg
+                className="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1.1, ease: 'linear', repeat: Infinity }}
+              >
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" opacity=".25" />
+                <circle cx="12" cy="3" r="2.4" fill="currentColor" />
+              </motion.svg>
+            </motion.span>
+          ) : isRecording ? (
+            <motion.svg
+              key="stop"
+              className="absolute h-4 w-4 fill-current"
+              viewBox="0 0 24 24"
+              initial={{ opacity: 0, scale: 0.5, rotate: -25 }}
+              animate={{ opacity: 1, scale: 1, rotate: 0 }}
+              exit={{ opacity: 0, scale: 0.5, rotate: 25 }}
+              transition={{ duration: 0.2 }}
+            >
+              <rect x="5" y="5" width="14" height="14" rx="3" />
+            </motion.svg>
+          ) : (
+            <motion.svg
+              key="mic"
+              className="absolute h-5 w-5 fill-current"
+              viewBox="0 0 24 24"
+              initial={{ opacity: 0, scale: 0.5, rotate: 25 }}
+              animate={{ opacity: 1, scale: 1, rotate: 0 }}
+              exit={{ opacity: 0, scale: 0.5, rotate: -25 }}
+              transition={{ duration: 0.2 }}
+            >
+              <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+              <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+            </motion.svg>
+          )}
+        </AnimatePresence>
+      </span>
+    </motion.button>
   );
 }

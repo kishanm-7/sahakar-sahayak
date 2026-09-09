@@ -2,17 +2,211 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Indic scripts have tall glyphs; a little extra line height keeps Devanagari,
-   Malayalam, and Tamil from looking cramped next to English. */
-body {
-  line-height: 1.65;
-  background-color: #FAF8F5;
-  color: #1F2937;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+@layer base {
+  :root {
+    --brand-700: #1B5E3F;
+    --brand-950: #0B2B1D;
+    /* --font-display is injected by next/font in app/layout.js.
+       --font-body stays a system stack so the four supported scripts render
+       with the OS fonts, which cover Indic far better than a Latin webfont.
+       It must be defined here: `font-family: var(--undefined), system-ui`
+       invalidates the whole declaration rather than falling through. */
+    --font-body: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+      'Noto Sans', 'Noto Sans Devanagari', 'Noto Sans Malayalam', 'Noto Sans Tamil',
+      'Helvetica Neue', Arial, sans-serif;
+
+    /* Mobile chrome offsets.
+       These live here rather than as Tailwind arbitrary values because
+       `bottom-[calc(theme(spacing.nav)_+_env(...))]` did not compile to the
+       value it reads like -- it resolved to 645px and threw the composer to the
+       top of the screen. A plain custom property is unambiguous, and every
+       consumer just references it. */
+    --nav-h: 4.25rem; /* height of the mobile bottom tab bar */
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    /* Where the chat composer sits: above the tab bar and the home indicator. */
+    --composer-bottom: calc(var(--nav-h) + var(--safe-b) + 0.85rem);
+    /* How much room page content must leave so nothing hides behind them. */
+    --content-bottom: calc(var(--nav-h) + var(--safe-b) + 1rem);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    /* Stops the page width jumping when a result card makes content scrollable. */
+    scrollbar-gutter: stable;
+    /* This is a light-only design. Declaring it stops Chrome's auto-dark-mode
+       from inverting the palette for users whose OS is set to dark, which
+       otherwise turns the cream canvas near-black and muddies the greens. */
+    color-scheme: light;
+  }
+
+  body {
+    background-color: theme('colors.canvas');
+    color: theme('colors.slate.800');
+    /* Indic scripts have tall glyphs; extra leading keeps Devanagari,
+       Malayalam and Tamil from looking cramped next to English. */
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Confident, tightly-tracked headings against the looser body copy. */
+  h1, h2, h3 {
+    font-family: theme('fontFamily.display');
+    letter-spacing: -0.022em;
+    line-height: 1.15;
+  }
+
+  /* Indic text needs the body stack even inside a heading, since the Latin
+     display face has no Devanagari/Malayalam/Tamil glyphs to fall back on. */
+  :lang(hi), :lang(ml), :lang(ta), .font-indic {
+    font-family: theme('fontFamily.sans');
+    letter-spacing: normal;
+  }
+
+  ::selection {
+    background: rgba(46, 158, 104, 0.22);
+  }
+
+  /* ---- Touch behaviour ------------------------------------------------
+     Most users reach this on a phone, so the mobile defaults matter more
+     than the desktop ones. */
+
+  /* Kill the grey flash Android/iOS paint over tapped elements -- the
+     Framer press animations already give feedback. */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* 16px is the threshold below which iOS Safari zooms the viewport on
+     focus. Anything the user types into has to meet it. */
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  /* Indic glyphs carry marks above and below the baseline, which collide at
+     phone sizes. Give them more room than the Latin body copy gets. */
+  :lang(hi),
+  :lang(ml),
+  :lang(ta),
+  .font-indic {
+    line-height: 1.85;
+  }
+
+  /* Focus ring that matches the brand instead of the browser default. */
+  :focus-visible {
+    outline: 2px solid theme('colors.brand.600');
+    outline-offset: 2px;
+  }
 }
 
-/* Custom scrollbar and smooth transitions */
-html {
-  scroll-behavior: smooth;
+@layer components {
+  /* Frosted panel used by the nav and the floating composer. */
+  .glass {
+    background-color: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+  }
+
+  /* A hairline gradient border. The card paints its own background over an
+     inset layer, so only the 1px rim shows the gradient through. */
+  .edge-gradient {
+    position: relative;
+  }
+  .edge-gradient::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(140deg, rgba(46,158,104,.45), rgba(14,124,107,.16) 45%, rgba(11,43,29,.06));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* Horizontal scrollers (the suggestion chips) keep their swipe but lose the
+     bar, which otherwise sits on top of the chips on Android. */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Sweep used for skeleton/shimmer loading states. */
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+  .shimmer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.65), transparent);
+    animation: shimmer 1.8s infinite;
+  }
 }
 
+@layer utilities {
+  .text-gradient {
+    background: linear-gradient(115deg, #1B5E3F 0%, #177055 45%, #0E7C6B 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Very fine grain over the ambient hero wash, so the gradient reads as
+     paper rather than as a flat CSS gradient. */
+  .grain::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.5;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.32'/%3E%3C/svg%3E");
+  }
+}
+
+/* Custom scrollbar -- desktop only, Firefox gets the thin variant. */
+@media (pointer: fine) {
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(27, 94, 63, 0.18);
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(27, 94, 63, 0.32);
+    background-clip: content-box;
+  }
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(27, 94, 63, 0.22) transparent;
+}
+
+/* Respect the OS "reduce motion" setting: kill ambient loops and shorten
+   everything else. Framer Motion reads this separately via MotionConfig. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

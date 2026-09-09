@@ -15,7 +15,10 @@ import { MODELS } from '../lib/openai.js';
 const require = createRequire(import.meta.url);
 const pdfParse = require('pdf-parse/lib/pdf-parse.js');
 
-const DOCUMENTS_DIR = path.join(process.cwd(), 'documents');
+// Your RAG knowledge-base documents live here, organised into subfolders.
+// The ingest script reads this folder recursively, so every PDF in every
+// subfolder is picked up automatically.
+const DOCUMENTS_DIR = path.join(process.cwd(), 'data', 'RAG DOCS');
 const CATEGORY_CONFIG = path.join(process.cwd(), 'config', 'categories.json');
 
 // Embeddings are cheap but rate limits are real. 64 chunks per request keeps
@@ -26,29 +29,44 @@ const BATCH_SIZE = 64;
 /**
  * Work out which topic a file belongs to.
  *
- * First choice is your manual mapping in config/categories.json. Failing that
- * we guess from the filename, which is why naming files something like
- * "pmfby-guidelines-2024.pdf" pays off.
+ * Priority 1: manual override in config/categories.json (keyed by filename).
+ * Priority 2: parent subfolder name — since the user organised files into
+ *             named category folders (e.g. "AGRI OR PM KISAN"), we map those
+ *             folder names directly to canonical categories.
+ * Priority 3: keyword scan of the filename itself.
+ * Fallback   : 'scheme' (the broadest bucket).
  */
-function categoriseFile(filename, manualMap) {
+function categoriseFile(filePath, manualMap) {
+  const filename = path.basename(filePath);
   if (manualMap[filename]) return manualMap[filename];
 
+  // Use the immediate parent folder name as a strong category hint.
+  const folderName = path.basename(path.dirname(filePath)).toLowerCase();
+  const folderRules = [
+    { category: 'pmfby',    keywords: ['agri', 'pm kisan', 'kisan', 'pmfby', 'crop', 'insurance'] },
+    { category: 'scheme',   keywords: ['cooperative', 'coooperative'] },
+    { category: 'finance',  keywords: ['financial', 'finaincial', 'finance'] },
+    { category: 'grievance',keywords: ['grievance', 'complaint'] },
+    { category: 'scheme',   keywords: ['regional', 'regonall', 'kerala', 'state'] },
+  ];
+  for (const rule of folderRules) {
+    if (rule.keywords.some((k) => folderName.includes(k))) return rule.category;
+  }
+
+  // Fall back to filename keyword scan.
   const name = filename.toLowerCase();
   const rules = [
-    { category: 'pmfby', keywords: ['pmfby', 'fasal', 'crop', 'insurance', 'bima', 'kisan'] },
-    { category: 'grievance', keywords: ['grievance', 'complaint', 'redress', 'shikayat', 'ombudsman'] },
-    { category: 'finance', keywords: ['financial', 'finance', 'literacy', 'credit', 'loan', 'saving', 'banking'] },
-    { category: 'law', keywords: ['act', 'law', 'bylaw', 'by-law', 'rule', 'legal', 'amendment', 'section'] },
-    { category: 'scheme', keywords: ['scheme', 'yojana', 'ministry', 'pacs', 'nabard', 'programme', 'policy'] },
+    { category: 'pmfby',    keywords: ['pmfby', 'fasal', 'crop', 'insurance', 'bima', 'kisan'] },
+    { category: 'grievance',keywords: ['grievance', 'complaint', 'redress', 'shikayat', 'ombudsman'] },
+    { category: 'finance',  keywords: ['financial', 'finance', 'literacy', 'credit', 'loan', 'saving', 'banking'] },
+    { category: 'law',      keywords: ['act', 'law', 'bylaw', 'by-law', 'rule', 'legal', 'amendment', 'section'] },
+    { category: 'scheme',   keywords: ['scheme', 'yojana', 'ministry', 'pacs', 'nabard', 'programme', 'policy'] },
   ];
-
   for (const rule of rules) {
     if (rule.keywords.some((k) => name.includes(k))) return rule.category;
   }
 
-  // Unknown files land in 'scheme', the broadest bucket. Retrieval searches
-  // every category by default, so a wrong guess costs accuracy, not answers.
-  return 'scheme';
+  return 'scheme'; // broadest fallback
 }
 
 async function extractText(filePath) {
@@ -102,7 +120,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`\nIngesting ${files.length} file(s) from /documents\n`);
+  console.log(`\nIngesting ${files.length} file(s) from data/RAG DOCS\n`);
 
   // ---- Step 1: read every file and split it into chunks --------------------
   const pending = [];
@@ -129,7 +147,7 @@ async function main() {
       continue;
     }
 
-    const category = categoriseFile(filename, manualMap);
+    const category = categoriseFile(filePath, manualMap);
     const chunks = chunkText(text);
 
     chunks.forEach((chunkTextValue, i) => {

@@ -1,21 +1,22 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 
 const STATUS_LABELS = {
-  submitted: 'Submitted — waiting to be picked up',
-  in_review: 'Under review by the cooperative office',
-  forwarded: 'Forwarded to the concerned department',
+  submitted: 'Submitted — Waiting Review',
+  in_review: 'Under Review by Office',
+  forwarded: 'Forwarded to Department',
   resolved: 'Resolved',
   closed: 'Closed',
 };
 
 const STATUS_STYLES = {
-  submitted: 'bg-amber-100 text-amber-800',
-  in_review: 'bg-blue-100 text-blue-800',
-  forwarded: 'bg-indigo-100 text-indigo-800',
-  resolved: 'bg-emerald-100 text-emerald-800',
-  closed: 'bg-slate-200 text-slate-700',
+  submitted: 'bg-blue-50 text-blue-700 border-blue-200',
+  in_review: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  forwarded: 'bg-amber-50 text-amber-800 border-amber-200',
+  resolved: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+  closed: 'bg-slate-100 text-slate-700 border-slate-300',
 };
 
 export default function TrackPage() {
@@ -56,97 +57,135 @@ export default function TrackPage() {
   }, [lookup]);
 
   return (
-    <div>
-      <h1 className="text-xl font-semibold">Track a Grievance</h1>
-      <p className="mt-1 text-sm text-slate-600">
-        Enter the reference number you received when you filed it.
-      </p>
+    <div className="flex flex-col gap-6">
+      {/* Page Header */}
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Track a Grievance</h1>
+        <p className="mt-1 text-sm text-slate-600">
+          Enter the reference ID (e.g. GRV-XXXXX) to check the status of your filing.
+        </p>
+      </div>
 
+      {/* Lookup Form */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
           lookup(ref);
         }}
-        className="mt-5 flex flex-wrap gap-2"
+        className="flex flex-wrap gap-2.5 rounded-2xl border border-emerald-900/10 bg-white p-3 shadow-sm"
       >
         <input
           value={ref}
           onChange={(e) => setRef(e.target.value.toUpperCase())}
           placeholder="GRV-XXXXXXXX"
-          className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 font-mono tracking-wider outline-none focus:border-emerald-500"
+          className="min-w-0 flex-1 rounded-xl border border-slate-300 px-4 py-2.5 font-mono text-base tracking-wider outline-none transition-all focus:border-[#1B5E3F] focus:ring-2 focus:ring-emerald-600/20"
         />
         <button
           type="submit"
           disabled={busy || !ref.trim()}
-          className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+          className="rounded-xl bg-[#1B5E3F] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#154a32] disabled:opacity-50 transition-all shadow-sm active:scale-95"
         >
-          {busy ? 'Checking…' : 'Check status'}
+          {busy ? 'Checking…' : 'Check Status'}
         </button>
       </form>
 
       {error && (
-        <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-800 shadow-xs">
+          ⚠️ {error}
+        </div>
       )}
 
+      {/* Result Card */}
       {record && (
-        <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5">
-          <div className="flex flex-wrap items-center gap-3">
-            <code className="font-mono text-lg font-semibold tracking-wider">
-              {record.referenceId}
-            </code>
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-medium ${
-                STATUS_STYLES[record.status] || 'bg-slate-100 text-slate-700'
+        <div className="flex flex-col gap-6 rounded-2xl border border-emerald-900/10 bg-white p-6 shadow-md">
+          {/* Card Header with Reference ID & Status Badge */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                Reference ID
+              </span>
+              <div className="font-mono text-2xl font-extrabold tracking-wider text-slate-900">
+                {record.referenceId}
+              </div>
+            </div>
+            {/* Status Pill Badge */}
+            <div
+              className={`rounded-full border px-4 py-1.5 text-xs font-extrabold uppercase tracking-wide shadow-2xs ${
+                STATUS_STYLES[record.status] || 'bg-slate-100 text-slate-700 border-slate-300'
               }`}
             >
-              {STATUS_LABELS[record.status] || record.status}
-            </span>
+              ● {STATUS_LABELS[record.status] || record.status}
+            </div>
           </div>
 
-          <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+          {/* Details Grid */}
+          <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 bg-slate-50/70 p-4 rounded-xl border border-slate-200/60">
             <div>
-              <dt className="text-slate-500">Filed by</dt>
-              <dd className="font-medium">{record.name}</dd>
+              <dt className="text-xs font-semibold text-slate-500 uppercase">Filed by</dt>
+              <dd className="font-bold text-slate-900 mt-0.5">{record.name}</dd>
             </div>
             <div>
-              <dt className="text-slate-500">Category</dt>
-              <dd className="font-medium">{record.category}</dd>
+              <dt className="text-xs font-semibold text-slate-500 uppercase">Category</dt>
+              <dd className="font-bold text-slate-900 mt-0.5 capitalize">{record.category}</dd>
             </div>
             <div>
-              <dt className="text-slate-500">Filed on</dt>
-              <dd className="font-medium">
+              <dt className="text-xs font-semibold text-slate-500 uppercase">Filed on</dt>
+              <dd className="font-medium text-slate-800 mt-0.5">
                 {new Date(record.createdAt).toLocaleString()}
               </dd>
             </div>
             <div>
-              <dt className="text-slate-500">Last updated</dt>
-              <dd className="font-medium">
+              <dt className="text-xs font-semibold text-slate-500 uppercase">Last updated</dt>
+              <dd className="font-medium text-slate-800 mt-0.5">
                 {new Date(record.updatedAt).toLocaleString()}
               </dd>
             </div>
           </dl>
 
-          <div className="mt-4">
-            <p className="text-sm text-slate-500">Complaint</p>
-            <p className="mt-1 whitespace-pre-wrap text-sm">{record.description}</p>
+          {/* Complaint Description */}
+          <div>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              Grievance Description
+            </span>
+            <p className="mt-1.5 whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-800">
+              {record.description}
+            </p>
           </div>
 
+          {/* Activity History */}
           {record.history?.length > 0 && (
-            <div className="mt-5 border-t border-slate-200 pt-4">
-              <p className="text-sm font-medium text-slate-700">History</p>
-              <ol className="mt-2 flex flex-col gap-2">
+            <div className="border-t border-slate-100 pt-4">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                Status History Timeline
+              </span>
+              <ol className="mt-3 flex flex-col gap-2">
                 {record.history.map((h, i) => (
-                  <li key={i} className="text-sm text-slate-600">
-                    <span className="font-medium">
-                      {STATUS_LABELS[h.status] || h.status}
-                    </span>{' '}
-                    — {new Date(h.at).toLocaleString()}
-                    {h.note ? ` · ${h.note}` : ''}
+                  <li key={i} className="flex items-start gap-2.5 text-sm text-slate-700">
+                    <span className="mt-1 h-2 w-2 rounded-full bg-[#1B5E3F] shrink-0" />
+                    <div>
+                      <span className="font-bold text-slate-900">
+                        {STATUS_LABELS[h.status] || h.status}
+                      </span>{' '}
+                      <span className="text-xs text-slate-500">
+                        ({new Date(h.at).toLocaleString()})
+                      </span>
+                      {h.note && <p className="text-xs text-slate-600 mt-0.5">{h.note}</p>}
+                    </div>
                   </li>
                 ))}
               </ol>
             </div>
           )}
+
+          {/* Navigation Action - Back to Chat / Home Button */}
+          <div className="border-t border-slate-100 pt-4">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 rounded-xl border-2 border-[#1B5E3F] px-5 py-2.5 text-sm font-bold text-[#1B5E3F] hover:bg-emerald-50 transition-colors shadow-2xs"
+            >
+              ← Back to Chat
+            </Link>
+          </div>
         </div>
       )}
     </div>

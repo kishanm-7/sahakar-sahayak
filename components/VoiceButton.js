@@ -172,9 +172,6 @@ export default function VoiceButton({ onResult, onError, disabled }) {
     await ctx.close();
   }
 
-  const label =
-    state === 'recording' ? 'Release to send' : state === 'working' ? 'Listening…' : '🎤 Hold to speak';
-
   return (
     <button
       type="button"
@@ -183,14 +180,34 @@ export default function VoiceButton({ onResult, onError, disabled }) {
       onPointerDown={state === 'idle' ? startRecording : undefined}
       onPointerUp={state === 'recording' ? stopRecording : undefined}
       onPointerLeave={state === 'recording' ? stopRecording : undefined}
-      className={`shrink-0 rounded-lg border px-3 py-2 text-sm font-medium transition select-none ${
+      className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-all select-none focus:outline-none focus:ring-2 focus:ring-emerald-500/40 ${
         state === 'recording'
-          ? 'border-red-300 bg-red-100 text-red-700'
-          : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-50'
+          ? 'bg-rose-600 text-white animate-pulse shadow-md ring-4 ring-rose-200'
+          : state === 'working'
+          ? 'bg-emerald-800 text-white opacity-80 cursor-wait'
+          : 'bg-[#1B5E3F] text-white hover:bg-[#154a32] shadow-sm active:scale-95 disabled:opacity-50'
       }`}
-      title="Hold the button, speak, then let go"
+      title={
+        state === 'recording'
+          ? 'Release to send voice'
+          : state === 'working'
+          ? 'Processing audio…'
+          : 'Hold to speak'
+      }
+      aria-label="Hold to speak"
     >
-      {label}
+      {state === 'working' ? (
+        <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+      ) : (
+        <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
+          <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+          <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+        </svg>
+      )}
     </button>
   );
 }
+

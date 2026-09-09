@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 // ---------------------------------------------------------------------------
@@ -20,6 +20,21 @@ const TARGET_RATE = 16000;
 const SILENCE_THRESHOLD = 0.008; // RMS energy threshold for speech detection
 const SILENCE_TIMEOUT_MS = 1200; // Auto-stop after 1.2s of trailing silence following speech
 const MAX_RECORDING_MS = 10000;  // Hard safety cap: force-stop at 10 seconds
+
+// ---------------------------------------------------------------------------
+// Web Bluetooth — optional physical push-button.
+//
+// An ESP32 exposes one service with two characteristics: it NOTIFIES us when
+// its button is pressed, and we WRITE the current state back so it can drive
+// its own LED. The whole feature is additive -- nothing below the BLE helpers
+// touches the recording, PCM or /api/voice paths, and a pressed button is
+// routed through the very same handler as a tap on the mic.
+//
+// These UUIDs are fixed in the firmware; do not change them here alone.
+// ---------------------------------------------------------------------------
+const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
+const BUTTON_CHAR_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8'; // notify: "pressed"
+const STATUS_CHAR_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e'; // write: idle|listening|error
 
 /** Same linear interpolation as lib/audio.js, but on the browser side. */
 function resampleFloat32(input, fromRate, toRate) {
@@ -59,10 +74,133 @@ function decodeHeader(value) {
   }
 }
 
-export default function VoiceButton({ onResult, onError, disabled, language }) {
+export default function VoiceButton({ onResult, onError: onErrorProp, disabled, language }) {
   const [state, setState] = useState('idle'); // idle | recording | working
   const recorder = useRef(null);
   const stopRecordingRef = useRef(null);
+
+  // ---- Bluetooth state -----------------------------------------------------
+  // `supported` starts false and is set after mount: navigator does not exist
+  // during SSR, so probing it inline would break hydration.
+  const [bleSupported, setBleSupported] = useState(false);
+  const [bleConnected, setBleConnected] = useState(false);
+  const deviceRef = useRef(null);
+  const statusCharRef = useRef(null);
+  const buttonCharRef = useRef(null);
+  // Lets the notification listener -- registered once at connect time -- reach
+  // the CURRENT handleClick rather than the one captured on that render.
+  const handleClickRef = useRef(null);
+  // GATT rejects overlapping operations, so writes are chained rather than
+  // fired in parallel.
+  const writeChainRef = useRef(Promise.resolve());
+
+  useEffect(() => {
+    setBleSupported(typeof navigator !== 'undefined' && !!navigator.bluetooth);
+  }, []);
+
+  /** Fire-and-forget status push. Never rejects, never blocks the UI. */
+  function writeStatus(text) {
+    const char = statusCharRef.current;
+    if (!char) return;
+    writeChainRef.current = writeChainRef.current
+      .then(() => char.writeValue(new TextEncoder().encode(text)))
+      .catch(() => {
+        // A failed status write must not disturb recording; the device just
+        // misses one LED update.
+      });
+  }
+
+  // Wraps the caller's onError so a failure also reaches the device, without
+  // editing any of the recording code that already calls onError().
+  function onError(message) {
+    writeStatus('error');
+    onErrorProp?.(message);
+  }
+
+  function handleBleDisconnected() {
+    statusCharRef.current = null;
+    buttonCharRef.current = null;
+    setBleConnected(false);
+  }
+
+  function handleButtonNotification(event) {
+    const raw = event.target?.value;
+    if (!raw) return;
+    // Firmware may pad the payload with NULs.
+    const text = new TextDecoder().decode(raw).replace(/\0/g, '').trim();
+    if (text === 'pressed') {
+      // Exactly what tapping the mic does -- start if idle, stop if recording.
+      handleClickRef.current?.();
+    }
+  }
+
+  async function connectBle() {
+    if (!navigator.bluetooth) return;
+    try {
+      const device = await navigator.bluetooth.requestDevice({
+        filters: [{ services: [SERVICE_UUID] }],
+      });
+      device.addEventListener('gattserverdisconnected', handleBleDisconnected);
+
+      const server = await device.gatt.connect();
+      const service = await server.getPrimaryService(SERVICE_UUID);
+      const buttonChar = await service.getCharacteristic(BUTTON_CHAR_UUID);
+      const statusChar = await service.getCharacteristic(STATUS_CHAR_UUID);
+
+      await buttonChar.startNotifications();
+      buttonChar.addEventListener('characteristicvaluechanged', handleButtonNotification);
+
+      deviceRef.current = device;
+      buttonCharRef.current = buttonChar;
+      statusCharRef.current = statusChar;
+      setBleConnected(true);
+    } catch (err) {
+      handleBleDisconnected();
+      // Dismissing the chooser throws NotFoundError; that is a cancel, not a
+      // failure worth putting in front of the user.
+      if (err?.name !== 'NotFoundError') {
+        console.error(err);
+        onErrorProp?.('Could not connect to the button. Make sure it is powered on and nearby.');
+      }
+    }
+  }
+
+  function disconnectBle() {
+    const device = deviceRef.current;
+    deviceRef.current = null;
+    handleBleDisconnected();
+    try {
+      device?.removeEventListener('gattserverdisconnected', handleBleDisconnected);
+      if (device?.gatt?.connected) device.gatt.disconnect();
+    } catch {
+      // Already gone; nothing to clean up.
+    }
+  }
+
+  // Mirror the recording state onto the device so it can light its own LED.
+  useEffect(() => {
+    if (!bleConnected) return;
+    writeStatus(state === 'idle' ? 'idle' : 'listening');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, bleConnected]);
+
+  // Drop the radio link when the component goes away.
+  useEffect(() => {
+    return () => {
+      const device = deviceRef.current;
+      try {
+        buttonCharRef.current?.removeEventListener(
+          'characteristicvaluechanged',
+          handleButtonNotification
+        );
+        device?.removeEventListener('gattserverdisconnected', handleBleDisconnected);
+        if (device?.gatt?.connected) device.gatt.disconnect();
+      } catch {
+        // ignore teardown errors
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function startRecording() {
     try {
@@ -268,6 +406,12 @@ export default function VoiceButton({ onResult, onError, disabled, language }) {
     // While 'working' the button is disabled, so no action needed.
   }
 
+  // Refreshed every render so a BLE press always runs the current handler.
+  // Guarded by the same condition the mic button's `disabled` uses, so a
+  // physical press really is identical to a tap -- including doing nothing
+  // while the chat is busy or a previous clip is still being processed.
+  handleClickRef.current = disabled || state === 'working' ? null : handleClick;
+
   const ariaLabel =
     state === 'recording' ? 'Listening… tap to stop' : state === 'working' ? 'Processing…' : 'Tap to speak';
 
@@ -278,6 +422,9 @@ export default function VoiceButton({ onResult, onError, disabled, language }) {
   const isWorking = state === 'working';
 
   return (
+    // A fragment, so both buttons sit directly in the composer's existing flex
+    // row -- no wrapper div and no changes needed in the parent.
+    <>
     <motion.button
       type="button"
       disabled={disabled || isWorking}
@@ -382,5 +529,54 @@ export default function VoiceButton({ onResult, onError, disabled, language }) {
         </AnimatePresence>
       </span>
     </motion.button>
+
+    {/* ---- Bluetooth button ----
+        Hidden entirely where Web Bluetooth does not exist (iOS Safari, any
+        non-secure origin), so the composer looks untouched on those devices. */}
+    {bleSupported && (
+      <motion.button
+        type="button"
+        onClick={bleConnected ? disconnectBle : connectBle}
+        whileHover={{ scale: 1.06 }}
+        whileTap={{ scale: 0.92 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+        className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition-colors duration-300 ${
+          bleConnected
+            ? 'border-transparent bg-brand-gradient text-white shadow-glow'
+            : 'border-brand-900/10 bg-white/70 text-slate-400 shadow-soft hover:text-brand-700'
+        }`}
+        title={
+          bleConnected
+            ? 'Physical button connected — tap to disconnect'
+            : 'Connect the physical button over Bluetooth'
+        }
+        aria-label={
+          bleConnected ? 'Disconnect the physical button' : 'Connect the physical button'
+        }
+        aria-pressed={bleConnected}
+      >
+        {/* Slow pulse while linked, so the connection is legible at a glance. */}
+        {bleConnected && (
+          <motion.span
+            aria-hidden
+            className="absolute -inset-0.5 rounded-full bg-brand-400/30 blur-md"
+            animate={{ opacity: [0.3, 0.7, 0.3] }}
+            transition={{ duration: 2.4, ease: 'easeInOut', repeat: Infinity }}
+          />
+        )}
+        <svg
+          className="relative z-10 h-[18px] w-[18px]"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="m7 7 10 10-5 5V2l5 5L7 17" />
+        </svg>
+      </motion.button>
+    )}
+    </>
   );
 }

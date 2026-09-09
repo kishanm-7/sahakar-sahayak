@@ -269,7 +269,7 @@ export default function GrievancePage() {
               rows={5}
               value={form.description}
               onChange={(e) => update('description', e.target.value)}
-              placeholder="Describe your concern clearly in any language (English, Hindi, Malayalam, etc.)."
+              placeholder="Describe your concern clearly in English, Hindi, Malayalam, or Tamil."
               className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition-all focus:border-[#1B5E3F] focus:ring-2 focus:ring-emerald-600/20 leading-relaxed"
             />
           </label>

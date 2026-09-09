@@ -19,7 +19,7 @@ export default function ChatPage() {
     {
       role: 'assistant',
       content:
-        'Namaste! Ask me anything about cooperative law, government schemes, PMFBY crop insurance, savings and loans, or filing a grievance. Write in any Indian language — I will reply in the same one.',
+        'Namaste! Ask me anything about cooperative law, government schemes, PMFBY crop insurance, savings and loans, or filing a grievance. Ask in English, Hindi, Malayalam, or Tamil.',
     },
   ]);
   const [busy, setBusy] = useState(false);
@@ -86,7 +86,7 @@ export default function ChatPage() {
           </div>
           <div>
             <h2 className="font-bold text-base leading-tight">Multilingual Cooperative Helpline</h2>
-            <p className="text-xs text-emerald-100">Ask in Hindi, English, Malayalam, Marathi, Tamil, Bengali & more</p>
+            <p className="text-xs text-emerald-100">Ask in English, Hindi, Malayalam, or Tamil</p>
           </div>
         </div>
         <Link
@@ -210,7 +210,7 @@ export default function ChatPage() {
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Type your question in any language…"
+          placeholder="Type your question in English, Hindi, Malayalam, or Tamil…"
           className="min-w-0 flex-1 bg-transparent px-3 py-1 text-[15px] outline-none text-slate-800 placeholder:text-slate-400 font-normal"
         />
 

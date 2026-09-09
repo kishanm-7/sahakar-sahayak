@@ -2,8 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Indic scripts have tall glyphs; a little extra line height keeps Devanagari
-   and Bengali from looking cramped next to English. */
+/* Indic scripts have tall glyphs; a little extra line height keeps Devanagari,
+   Malayalam, and Tamil from looking cramped next to English. */
 body {
   line-height: 1.65;
   background-color: #FAF8F5;
